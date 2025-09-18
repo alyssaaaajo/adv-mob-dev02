@@ -15,7 +15,7 @@ export default function TabFourScreen() {
       {/* Top Section: Logo + Title */}
       <View style={styles.topSection}>
         <Image
-          source={require('@/assets/images/icon.png')}
+          source={require('@/assets/images/spotify.png')}
           style={styles.logo}
         />
         <ThemedText type="title" style={styles.title}>Spotify</ThemedText>
