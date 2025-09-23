@@ -2,7 +2,7 @@ import React, { useReducer, useEffect, useState } from "react";
 import 'react-native-reanimated';
 import { Swipeable } from "react-native-gesture-handler";
 import { MaterialIcons } from "@expo/vector-icons";
-
+import { useTheme } from '../contexts/ThemeContext';
 
 import {
   View,
@@ -93,8 +93,9 @@ function reducer(state: State, action: Action): State {
 export default function PlaylistScreen() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [input, setInput] = useState("");
+  const { theme } = useTheme();
 
-  // ✅ Load from AsyncStorage
+  // Load from AsyncStorage
   useEffect(() => {
     const loadData = async () => {
       const saved = await AsyncStorage.getItem("playlistState");
@@ -109,10 +110,12 @@ export default function PlaylistScreen() {
     loadData();
   }, []);
 
-  // ✅ Save to AsyncStorage
+  // Save to AsyncStorage
   useEffect(() => {
     AsyncStorage.setItem("playlistState", JSON.stringify(state));
   }, [state]);
+
+  const styles = getStyles(theme);
 
   return (
     <View style={styles.container}>
@@ -125,7 +128,7 @@ export default function PlaylistScreen() {
           value={input}
           onChangeText={setInput}
           placeholder="Enter song name"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={theme === 'dark' ? '#aaa' : '#555'}
         />
         <TouchableOpacity
           style={styles.button}
@@ -185,46 +188,74 @@ export default function PlaylistScreen() {
           </Swipeable>
         )}
       />
-
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#191414", padding: 20 },
-  header: { color: "#fff", fontSize: 24, marginBottom: 20 },
-  inputRow: { flexDirection: "row", marginBottom: 15 },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    color: "#fff",
-  },
-  button: {
-    backgroundColor: "#1DB954",
-    paddingHorizontal: 15,
-    marginLeft: 10,
-    borderRadius: 5,
-    justifyContent: "center",
-  },
-  buttonText: { color: "#fff", fontWeight: "bold" },
-  actions: { flexDirection: "row", justifyContent: "space-between", marginBottom: 15 },
-  actionButton: {
-    backgroundColor: "#333",
-    padding: 10,
-    borderRadius: 5,
-  },
-  songItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 10,
-    backgroundColor: "#282828",
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  songText: { color: "#fff", fontSize: 16 },
-  removeText: { color: "#f55", fontSize: 16 },
-});
-
+const getStyles = (theme: 'dark' | 'light') =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme === 'dark' ? '#191414' : '#fff',
+      padding: 20,
+    },
+    header: {
+      color: theme === 'dark' ? '#fff' : '#000',
+      fontSize: 24,
+      marginBottom: 20,
+    },
+    inputRow: {
+      flexDirection: "row",
+      marginBottom: 15,
+    },
+    input: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme === 'dark' ? '#555' : '#ccc',
+      borderRadius: 5,
+      paddingHorizontal: 10,
+      color: theme === 'dark' ? '#fff' : '#000',
+    },
+    button: {
+      backgroundColor: "#1DB954",
+      paddingHorizontal: 15,
+      marginLeft: 10,
+      borderRadius: 5,
+      justifyContent: "center",
+    },
+    buttonText: {
+      color: "#fff",
+      fontWeight: "bold",
+    },
+    actions: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 15,
+    },
+    actionButton: {
+      backgroundColor: theme === 'dark' ? '#333' : '#ddd',
+      padding: 10,
+      borderRadius: 5,
+    },
+    songItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 10,
+      backgroundColor: theme === 'dark' ? '#282828' : '#f9f9f9',
+      borderRadius: 5,
+      marginBottom: 10,
+    },
+    songText: {
+      color: theme === 'dark' ? '#fff' : '#000',
+      fontSize: 16,
+    },
+    deleteButton: {
+      justifyContent: "center",
+      alignItems: "center",
+      width: 70,
+      backgroundColor: "#ffdddd",
+      borderRadius: 5,
+      marginLeft: 10,
+      marginVertical: 5,
+    },
+  });

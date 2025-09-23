@@ -1,5 +1,5 @@
-// screens/PlaylistScreen.tsx
 import React from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 import {
   View,
@@ -24,13 +24,13 @@ const playlists = [
 
 export default function PlaylistScreen() {
   const router = useRouter();
-    const numColumns = 2;
-
+  const { theme } = useTheme();
 
   const handlePress = (playlistId: string) => {
-    // Navigate to a new screen, passing the playlistId as param
     router.push(`AddSongs`);
   };
+
+  const styles = getStyles(theme);
 
   return (
     <View style={styles.container}>
@@ -54,46 +54,36 @@ export default function PlaylistScreen() {
   );
 }
 
-// const styles = StyleSheet.create({
-//   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-//   header: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
-//   playlistItem: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     marginBottom: 12,
-//     padding: 8,
-//     borderRadius: 8,
-//     backgroundColor: "#f0f0f0",
-//   },
-//   coverImage: { width: 50, height: 50, marginRight: 12, borderRadius: 8 },
-//   title: { fontSize: 18 },
-// });
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#191414',
-    padding: 20,
-  },
-  header: {
-    color: '#fff',
-    fontSize: 24,
-    marginBottom: 20,
-  },
-  playlistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  coverImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 5,
-    marginRight: 15,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 16,
-  },
-});
+const getStyles = (theme: 'dark' | 'light') =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme === 'dark' ? '#191414' : '#fff',
+      padding: 20,
+    },
+    header: {
+      color: theme === 'dark' ? '#fff' : '#000',
+      fontSize: 24,
+      marginBottom: 20,
+    },
+    playlistItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+      backgroundColor: theme === 'dark' ? '#282828' : '#f0f0f0',
+      borderRadius: 8,
+      padding: 10,
+      flex: 1,
+      marginHorizontal: 5,
+    },
+    coverImage: {
+      width: 60,
+      height: 60,
+      borderRadius: 5,
+      marginRight: 15,
+    },
+    title: {
+      color: theme === 'dark' ? '#fff' : '#000',
+      fontSize: 16,
+    },
+  });
