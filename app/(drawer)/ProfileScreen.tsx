@@ -1,244 +1,344 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { Modal, TouchableOpacity, View, Text, TextInput, StyleSheet, Image, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import { launchImageLibrary } from 'react-native-image-picker';
-
-const STORAGE_KEY_NAME = '@profile_name';
-const STORAGE_KEY_EMAIL = '@profile_email';
-const STORAGE_KEY_PROFILE_PIC = '@profile_pic_uri';
+import { useSharedValue, withTiming, withSequence, withRepeat, useAnimatedStyle } from 'react-native-reanimated';
+import * as FileSystem from 'expo-file-system';
 
 export default function ProfileScreen() {
-  const [name, setName] = useState('Akaza');
-  const [email, setEmail] = useState('relapseGodz@email.com');
-  const [profilePicUri, setProfilePicUri] = useState(
-    Image.resolveAssetSource(require('@/assets/images/profile.jpg')).uri
-  );
-  const [isEditing, setIsEditing] = useState(false);
+  const router = useRouter();
+
+  // Saved profile state
+  const [profileUsername, setProfileUsername] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Draft states (for modal editing)
+  const [draftUsername, setDraftUsername] = useState('');
+  const [draftEmail, setDraftEmail] = useState('');
+  const [draftImage, setDraftImage] = useState<string | null>(null);
+
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // Error states
+  const [usernameError, setUsernameError] = useState('');
   const [emailError, setEmailError] = useState('');
-  const { theme } = useTheme();
 
-  const shake = useSharedValue(0);
+  const fadeIn = useSharedValue(0);
+  const shakeAnimation = useSharedValue(0);
 
-  // Load saved data on mount
+  const profileImageOpacity = useAnimatedStyle(() => {
+    return { opacity: withTiming(fadeIn.value, { duration: 500 }) };
+  });
+
+  const shakeStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateX: withRepeat(
+            withSequence(withTiming(-10), withTiming(10), withTiming(-10), withTiming(10)),
+            2,
+            false
+          )
+        }
+      ]
+    };
+  });
+
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const savedName = await AsyncStorage.getItem(STORAGE_KEY_NAME);
-        const savedEmail = await AsyncStorage.getItem(STORAGE_KEY_EMAIL);
-        const savedPicUri = await AsyncStorage.getItem(STORAGE_KEY_PROFILE_PIC);
+    if (modalVisible) fadeIn.value = 1;
+  }, [modalVisible]);
 
-        if (savedName !== null) setName(savedName);
-        if (savedEmail !== null) setEmail(savedEmail);
-        if (savedPicUri !== null) setProfilePicUri(savedPicUri);
-      } catch (e) {
-        console.log('Failed to load profile data:', e);
-      }
-    }
+  // Load saved profile data from AsyncStorage
+  useEffect(() => {
+    const loadProfileData = async () => {
+      const storedUsername = await AsyncStorage.getItem('username');
+      const storedEmail = await AsyncStorage.getItem('email');
+      const storedImage = await AsyncStorage.getItem('profileImage');
 
-    loadProfile();
+      setProfileUsername(storedUsername || 'Fredrinn');
+      setProfileEmail(storedEmail || 'fredrinnvance6wapo@mail.com');
+      setProfileImage(storedImage);
+    };
+    loadProfileData();
   }, []);
 
-  const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
+  // Open modal with current saved profile copied into drafts
+  const handleOpenModal = () => {
+    setDraftUsername(profileUsername);
+    setDraftEmail(profileEmail);
+    setDraftImage(profileImage);
+    setModalVisible(true);
+  };
 
-  // Save data to AsyncStorage
-  const saveProfile = async (newName: string, newEmail: string) => {
+  // Cancel editing -> discard drafts
+  const handleCloseModal = () => {
+    setDraftUsername(profileUsername);
+    setDraftEmail(profileEmail);
+    setDraftImage(profileImage);
+    setModalVisible(false);
+  };
+
+  const requestPermissions = async () => {
+    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    const libraryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (cameraStatus.status !== 'granted' || libraryStatus.status !== 'granted') {
+      Alert.alert('Permission required', 'Camera and photo library permissions are required.');
+      return false;
+    }
+    return true;
+  };
+
+  const saveImage = async (uri: string) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY_NAME, newName);
-      await AsyncStorage.setItem(STORAGE_KEY_EMAIL, newEmail);
-    } catch (e) {
-      console.log('Failed to save profile data:', e);
+      const filename = uri.split('/').pop();
+      const newPath = FileSystem.documentDirectory + filename;
+      await FileSystem.copyAsync({ from: uri, to: newPath });
+      return newPath;
+    } catch (err) {
+      console.error('Failed to save image:', err);
+      return null;
     }
   };
 
-  // Save profile pic uri
-  const saveProfilePicUri = async (uri: string) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY_PROFILE_PIC, uri);
-    } catch (e) {
-      console.log('Failed to save profile pic:', e);
-    }
-  };
+  // Pick or snap image (draft only)
+  const pickImage = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
 
-  const handleSave = () => {
-    if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address.');
-      shake.value = withSequence(
-        withTiming(-10, { duration: 50 }),
-        withTiming(10, { duration: 50 }),
-        withTiming(-10, { duration: 50 }),
-        withTiming(10, { duration: 50 }),
-        withTiming(0, { duration: 50 })
-      );
-      return;
-    }
-    setEmailError('');
-    setIsEditing(false);
-    saveProfile(name, email); // Save name/email
-  };
-
-  const toggleEdit = () => {
-    if (isEditing) {
-      handleSave();
-    } else {
-      setIsEditing(true);
-    }
-  };
-
-  // Open image library to pick profile pic
-  const pickImage = () => {
-    launchImageLibrary(
+    Alert.alert('Select Image', 'Choose an option', [
       {
-        mediaType: 'photo',
-        quality: 0.8,
-      },
-      (response) => {
-        if (response.didCancel) {
-          // User cancelled
-          return;
-        }
-        if (response.errorCode) {
-          Alert.alert('Error', response.errorMessage || 'ImagePicker Error');
-          return;
-        }
-        if (response.assets && response.assets.length > 0) {
-          const pickedUri = response.assets[0].uri;
-          if (pickedUri) {
-            setProfilePicUri(pickedUri);
-            saveProfilePicUri(pickedUri);
+        text: 'Camera',
+        onPress: async () => {
+          let result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7
+          });
+          if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            const newPath = await saveImage(uri);
+            if (newPath) setDraftImage(newPath);
           }
         }
-      }
-    );
+      },
+      {
+        text: 'Gallery',
+        onPress: async () => {
+          let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7
+          });
+          if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            const newPath = await saveImage(uri);
+            if (newPath) setDraftImage(newPath);
+          }
+        }
+      },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
   };
 
-  const animatedShakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shake.value }],
-  }));
+  // Validate form
+  const validateForm = () => {
+    let isValid = true;
 
-  const styles = getStyles(theme);
+    if (!draftUsername.match(/^[a-zA-Z0-9_]{3,20}$/)) {
+      setUsernameError('Username must be 3-20 characters, alphanumeric or underscores only.');
+      isValid = false;
+      shakeAnimation.value = withRepeat(
+        withSequence(withTiming(-10), withTiming(10), withTiming(-10), withTiming(10)),
+        2,
+        false
+      );
+    } else {
+      setUsernameError('');
+    }
+
+    if (!draftEmail.match(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/)) {
+      setEmailError('Please enter a valid email address.');
+      isValid = false;
+      shakeAnimation.value = withRepeat(
+        withSequence(withTiming(-10), withTiming(10), withTiming(-10), withTiming(10)),
+        2,
+        false
+      );
+    } else {
+      setEmailError('');
+    }
+
+    return isValid;
+  };
+
+  // Save draft -> commit to saved profile and AsyncStorage
+  const handleSubmit = async () => {
+    if (validateForm()) {
+      await AsyncStorage.setItem('username', draftUsername);
+      await AsyncStorage.setItem('email', draftEmail);
+      if (draftImage) await AsyncStorage.setItem('profileImage', draftImage);
+
+      setProfileUsername(draftUsername);
+      setProfileEmail(draftEmail);
+      setProfileImage(draftImage);
+
+      setModalVisible(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={pickImage}>
-        <Image source={{ uri: profilePicUri }} style={styles.profilePic} />
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 55, left: 15, zIndex: 10 }}
+        onPress={() => router.push('../(tabs)')}
+      >
+        <MaterialIcons name="arrow-back-ios-new" size={20} color="#ffffffc4" />
       </TouchableOpacity>
-      <Text style={{ color: theme === 'dark' ? '#888' : '#555', marginBottom: 10 }}>
 
-      </Text>
-
-      {isEditing ? (
-        <>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Username"
-            placeholderTextColor={theme === 'dark' ? '#aaa' : '#555'}
+      <LinearGradient
+        colors={['#9a7183ff', '#121212']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={{ width: '100%', height: '30%', justifyContent: 'center', marginBottom: 30 }}
+      >
+        <View style={styles.logoRow}>
+          <Image
+            source={profileImage ? { uri: profileImage } : require('@/assets/images/naruto.png')}
+            style={styles.imagePlaceholder}
           />
-          <Animated.View style={[animatedShakeStyle, { width: '100%' }]}>
-            <TextInput
-              style={[styles.input, emailError ? styles.errorInput : null]}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (emailError) setEmailError('');
-              }}
-              placeholder="Email"
-              placeholderTextColor={theme === 'dark' ? '#aaa' : '#555'}
-              keyboardType="email-address"
-            />
-          </Animated.View>
-          {emailError ? (
-            <Text style={styles.errorText}>{emailError}</Text>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.email}>{email}</Text>
-        </>
-      )}
+          <View style={[profileImageOpacity]}>
+            <Text style={styles.title}>{profileUsername}</Text>
+            <Text style={styles.subtitle}>{profileEmail}</Text>
+            <Text style={styles.counter}>18,910 followers ⋅ 7 following</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
-      <TouchableOpacity style={styles.editButton} onPress={toggleEdit}>
-        <Text style={styles.buttonText}>
-          {isEditing ? 'Save' : 'Edit Profile'}
-        </Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 25, top: -20, left: 15 }}>
+        <TouchableOpacity style={styles.Button} onPress={handleOpenModal}>
+          <Text style={styles.loginText}>Edit</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={handleCloseModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+
+            <TouchableOpacity onPress={pickImage} style={{ alignSelf: 'center', marginBottom: 20 }}>
+              <Image
+                source={draftImage ? { uri: draftImage } : require('@/assets/images/naruto.png')}
+                style={[
+                  styles.imagePlaceholder,
+                  { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#1DB954' }
+                ]}
+              />
+              <Text style={{ color: '#1DB954', textAlign: 'center', marginTop: 8 }}>Change Photo</Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={[styles.input, usernameError && styles.inputError]}
+              placeholder="Username"
+              value={draftUsername}
+              onChangeText={setDraftUsername}
+            />
+            {usernameError && <Text style={styles.errorText}>{usernameError}</Text>}
+
+            <TextInput
+              style={[styles.input, emailError && styles.inputError]}
+              placeholder="Email"
+              value={draftEmail}
+              onChangeText={setDraftEmail}
+            />
+            {emailError && <Text style={styles.errorText}>{emailError}</Text>}
+
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+              <Text style={styles.loginText}>Save</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCloseModal}>
+              <Text style={styles.loginText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-const getStyles = (theme: 'dark' | 'light') =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme === 'dark' ? '#191414' : '#fff',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-    },
-    profilePic: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      marginBottom: 10,
-      backgroundColor: '#ccc',
-    },
-    name: {
-      fontSize: 24,
-      color: theme === 'dark' ? '#fff' : '#000',
-      marginBottom: 5,
-    },
-    email: {
-      fontSize: 16,
-      color: theme === 'dark' ? '#aaa' : '#555',
-      marginBottom: 30,
-    },
-    input: {
-      width: '100%',
-      height: 45,
-      borderColor: theme === 'dark' ? '#1DB954' : '#0a7d0a',
-      borderWidth: 1,
-      borderRadius: 25,
-      marginBottom: 10,
-      paddingHorizontal: 15,
-      color: theme === 'dark' ? '#fff' : '#000',
-      backgroundColor: theme === 'dark' ? 'transparent' : '#f2f2f2',
-    },
-    errorInput: {
-      borderColor: '#ff4d4d',
-    },
-    errorText: {
-      color: '#ff4d4d',
-      fontSize: 12,
-      marginBottom: 10,
-      alignSelf: 'flex-start',
-      paddingLeft: 10,
-    },
-    editButton: {
-      backgroundColor: '#1DB954',
-      paddingVertical: 10,
-      paddingHorizontal: 30,
-      borderRadius: 25,
-      marginTop: 20,
-    },
-    buttonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-  });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#121212' },
+  logoRow: {
+    flexDirection: 'row',
+    marginTop: '25%',
+    alignItems: 'center',
+    marginVertical: 10,
+    left: 15,
+    gap: 20
+  },
+  title: { fontWeight: 'bold', color: '#fff', fontSize: 30 },
+  subtitle: { color: '#8d8d8dff', fontSize: 12 },
+  counter: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  imagePlaceholder: {
+    width: 110,
+    height: 110,
+    resizeMode: 'cover',
+    borderRadius: 60,
+    backgroundColor: '#333'
+  },
+  input: {
+    width: '95%',
+    backgroundColor: '#1a1a1a',
+    padding: 15,
+    borderRadius: 20,
+    color: '#fff',
+    marginBottom: 20
+  },
+  inputError: { borderColor: 'red', borderWidth: 1 },
+  errorText: { color: 'red', fontSize: 12, alignSelf: 'center', marginBottom: 10 },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+  },
+  modalContainer: {
+    backgroundColor: '#121212',
+    padding: 30,
+    borderRadius: 10,
+    width: '80%'
+  },
+  modalTitle: { fontSize: 24, color: '#fff', marginBottom: 20, textAlign: 'center' },
+  submitButton: {
+    backgroundColor: '#1DB954',
+    padding: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 15
+  },
+  cancelButton: {
+    backgroundColor: '#6e6e6eff',
+    padding: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 10
+  },
+  Button: {
+    backgroundColor: 'transparent',
+    width: '17%',
+    padding: 6,
+    borderRadius: 50,
+    alignItems: 'center',
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: '#6e6e6eff'
+  },
+  loginText: { color: '#fff', fontWeight: 'bold' }
+});

@@ -3,6 +3,7 @@ import 'react-native-reanimated';
 import { Swipeable } from "react-native-gesture-handler";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 
 import {
   View,
@@ -94,6 +95,7 @@ export default function PlaylistScreen() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [input, setInput] = useState("");
   const { theme } = useTheme();
+  const navigation = useNavigation();
 
   // Load from AsyncStorage
   useEffect(() => {
@@ -119,6 +121,17 @@ export default function PlaylistScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Back button */}
+      <TouchableOpacity
+        onPress={() => navigation.navigate('PlaylistScreen')} // or the correct screen name you want to go back to
+        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}
+      >
+        <MaterialIcons name="arrow-back" size={24} color={theme === 'dark' ? '#fff' : '#000'} />
+        <Text style={{ marginLeft: 8, color: theme === 'dark' ? '#fff' : '#000', fontSize: 16 }}>
+
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.header}>🎵 Playlist Manager</Text>
 
       {/* Input */}
