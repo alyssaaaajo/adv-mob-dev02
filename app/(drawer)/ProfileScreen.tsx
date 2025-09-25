@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   View,
@@ -7,24 +7,72 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { launchImageLibrary } from 'react-native-image-picker';
+
+const STORAGE_KEY_NAME = '@profile_name';
+const STORAGE_KEY_EMAIL = '@profile_email';
+const STORAGE_KEY_PROFILE_PIC = '@profile_pic_uri';
 
 export default function ProfileScreen() {
   const [name, setName] = useState('Akaza');
   const [email, setEmail] = useState('relapseGodz@email.com');
+  const [profilePicUri, setProfilePicUri] = useState(
+    Image.resolveAssetSource(require('@/assets/images/profile.jpg')).uri
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [emailError, setEmailError] = useState('');
   const { theme } = useTheme();
 
   const shake = useSharedValue(0);
 
+  // Load saved data on mount
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const savedName = await AsyncStorage.getItem(STORAGE_KEY_NAME);
+        const savedEmail = await AsyncStorage.getItem(STORAGE_KEY_EMAIL);
+        const savedPicUri = await AsyncStorage.getItem(STORAGE_KEY_PROFILE_PIC);
+
+        if (savedName !== null) setName(savedName);
+        if (savedEmail !== null) setEmail(savedEmail);
+        if (savedPicUri !== null) setProfilePicUri(savedPicUri);
+      } catch (e) {
+        console.log('Failed to load profile data:', e);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
   const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
+
+  // Save data to AsyncStorage
+  const saveProfile = async (newName: string, newEmail: string) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_NAME, newName);
+      await AsyncStorage.setItem(STORAGE_KEY_EMAIL, newEmail);
+    } catch (e) {
+      console.log('Failed to save profile data:', e);
+    }
+  };
+
+  // Save profile pic uri
+  const saveProfilePicUri = async (uri: string) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_PROFILE_PIC, uri);
+    } catch (e) {
+      console.log('Failed to save profile pic:', e);
+    }
+  };
 
   const handleSave = () => {
     if (!validateEmail(email)) {
@@ -40,6 +88,7 @@ export default function ProfileScreen() {
     }
     setEmailError('');
     setIsEditing(false);
+    saveProfile(name, email); // Save name/email
   };
 
   const toggleEdit = () => {
@@ -50,6 +99,33 @@ export default function ProfileScreen() {
     }
   };
 
+  // Open image library to pick profile pic
+  const pickImage = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+      },
+      (response) => {
+        if (response.didCancel) {
+          // User cancelled
+          return;
+        }
+        if (response.errorCode) {
+          Alert.alert('Error', response.errorMessage || 'ImagePicker Error');
+          return;
+        }
+        if (response.assets && response.assets.length > 0) {
+          const pickedUri = response.assets[0].uri;
+          if (pickedUri) {
+            setProfilePicUri(pickedUri);
+            saveProfilePicUri(pickedUri);
+          }
+        }
+      }
+    );
+  };
+
   const animatedShakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.value }],
   }));
@@ -58,10 +134,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('@/assets/images/profile.jpg')}
-        style={styles.profilePic}
-      />
+      <TouchableOpacity onPress={pickImage}>
+        <Image source={{ uri: profilePicUri }} style={styles.profilePic} />
+      </TouchableOpacity>
+      <Text style={{ color: theme === 'dark' ? '#888' : '#555', marginBottom: 10 }}>
+
+      </Text>
 
       {isEditing ? (
         <>
@@ -117,7 +195,8 @@ const getStyles = (theme: 'dark' | 'light') =>
       width: 120,
       height: 120,
       borderRadius: 60,
-      marginBottom: 20,
+      marginBottom: 10,
+      backgroundColor: '#ccc',
     },
     name: {
       fontSize: 24,
