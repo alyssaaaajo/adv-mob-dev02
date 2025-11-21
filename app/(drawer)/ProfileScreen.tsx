@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSharedValue, withTiming, withSequence, withRepeat, useAnimatedStyle } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system';
+import { useTheme } from "../../src/contexts/ThemeContext";
+
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -59,8 +61,8 @@ export default function ProfileScreen() {
       const storedEmail = await AsyncStorage.getItem('email');
       const storedImage = await AsyncStorage.getItem('profileImage');
 
-      setProfileUsername(storedUsername || 'Fredrinn');
-      setProfileEmail(storedEmail || 'fredrinnvance6wapo@mail.com');
+      setProfileUsername(storedUsername || 'Akaza');
+      setProfileEmail(storedEmail || 'akaza_011@dmnslayer.com');
       setProfileImage(storedImage);
     };
     loadProfileData();
@@ -210,22 +212,34 @@ export default function ProfileScreen() {
       >
         <View style={styles.logoRow}>
           <Image
-            source={profileImage ? { uri: profileImage } : require('@/assets/images/naruto.png')}
+            source={profileImage ? { uri: profileImage } : require('@/assets/images/naruto.jpg')}
             style={styles.imagePlaceholder}
           />
           <View style={[profileImageOpacity]}>
             <Text style={styles.title}>{profileUsername}</Text>
             <Text style={styles.subtitle}>{profileEmail}</Text>
-            <Text style={styles.counter}>18,910 followers ⋅ 7 following</Text>
+            <Text style={styles.counter}>230.3k followers ⋅ 13 following</Text>
           </View>
         </View>
       </LinearGradient>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 25, top: -20, left: 15 }}>
+
+        {/* EDIT BUTTON */}
         <TouchableOpacity style={styles.Button} onPress={handleOpenModal}>
           <Text style={styles.loginText}>Edit</Text>
         </TouchableOpacity>
+
+        {/* NEW MAP BUTTON */}
+        <TouchableOpacity
+          style={[styles.Button, { width: "25%", borderColor: "#1DB954" }]}
+          onPress={() => router.push("MapScreen")}
+        >
+          <Text style={styles.loginText}>Map</Text>
+        </TouchableOpacity>
+
       </View>
+
 
       <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={handleCloseModal}>
         <View style={styles.modalOverlay}>
@@ -234,7 +248,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity onPress={pickImage} style={{ alignSelf: 'center', marginBottom: 20 }}>
               <Image
-                source={draftImage ? { uri: draftImage } : require('@/assets/images/naruto.png')}
+                source={draftImage ? { uri: draftImage } : require('@/assets/images/naruto.jpg')}
                 style={[
                   styles.imagePlaceholder,
                   { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#1DB954' }

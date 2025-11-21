@@ -52,6 +52,15 @@ export default function DrawerLayout() {
           ),
         }}
       />
+      <Drawer.Screen
+              name="MapScreen"
+              options={{
+                title: 'Map',
+                drawerIcon: ({ color, size }) => (
+                  <Ionicons name="settings" size={size} color={color} />
+                ),
+              }}
+            />
     </Drawer>
   );
 }
